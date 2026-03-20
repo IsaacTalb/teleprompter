@@ -1,0 +1,12 @@
+{
+  "name": "Isaac Teleprompter",
+  "short_name": "Teleprompter",
+  "description": "A lightweight creator-first teleprompter with camera preview, mirrored text, and offline install support.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": []
+}

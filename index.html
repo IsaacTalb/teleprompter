@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Teleprompter" />
+    <title>Isaac Teleprompter</title>
+    <link rel="manifest" href="manifest.json" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      .glass {
+        backdrop-filter: blur(14px);
+        background: rgba(15, 23, 42, 0.72);
+      }
+
+      .camera-overlay {
+        background: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0.15),
+          rgba(0, 0, 0, 0.5) 45%,
+          rgba(0, 0, 0, 0.85)
+        );
+      }
+
+      .mirror-text {
+        transform: scaleY(-1);
+      }
+
+      .scroll-surface::-webkit-scrollbar,
+      textarea::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .scroll-surface::-webkit-scrollbar-thumb,
+      textarea::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.5);
+        border-radius: 999px;
+      }
+    </style>
+  </head>
+  <body class="bg-black text-white">
+    <main class="relative min-h-screen overflow-hidden bg-black">
+      <section class="relative h-[46vh] min-h-[300px] w-full bg-slate-950">
+        <video
+          id="camera"
+          autoplay
+          playsinline
+          muted
+          class="h-full w-full object-cover opacity-90"
+        ></video>
+        <div class="camera-overlay pointer-events-none absolute inset-0"></div>
+        <div class="absolute left-4 top-4 rounded-full bg-black/55 px-3 py-1 text-xs font-medium uppercase tracking-[0.3em] text-white/80">
+          Creator Mode
+        </div>
+        <div id="cameraStatus" class="absolute bottom-4 left-4 rounded-full bg-black/55 px-3 py-1 text-sm text-white/80">
+          Requesting camera access…
+        </div>
+      </section>
+
+      <section class="relative -mt-12 z-10 px-4 pb-32 sm:px-6">
+        <div class="glass mx-auto flex w-full max-w-6xl flex-col gap-4 rounded-[2rem] border border-white/10 p-4 shadow-2xl shadow-cyan-900/20 lg:flex-row lg:gap-6 lg:p-6">
+          <div class="flex min-h-[420px] flex-1 flex-col rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-xs uppercase tracking-[0.3em] text-cyan-300/80">Live Script</p>
+                <h1 class="text-2xl font-semibold">Isaac Teleprompter</h1>
+              </div>
+              <div class="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm text-white/75">
+                <span id="scrollStateDot" class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+                <span id="scrollStateText">Paused</span>
+              </div>
+            </div>
+
+            <div
+              id="script"
+              class="scroll-surface mirror-text flex-1 overflow-y-auto rounded-[1.25rem] bg-black/40 px-5 py-8 text-center font-medium leading-relaxed text-white/95 outline-none"
+              style="font-size: 34px"
+              tabindex="0"
+              role="button"
+              aria-label="Teleprompter text. Tap to play or pause scrolling."
+            ></div>
+
+            <div class="mt-4 grid gap-3 text-sm text-white/70 sm:grid-cols-3">
+              <div class="rounded-2xl bg-white/5 p-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-white/45">Speed</p>
+                <p id="speedReadout" class="mt-1 text-lg font-semibold text-white">0.8 px/frame</p>
+              </div>
+              <div class="rounded-2xl bg-white/5 p-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-white/45">Text Size</p>
+                <p id="sizeReadout" class="mt-1 text-lg font-semibold text-white">34 px</p>
+              </div>
+              <div class="rounded-2xl bg-white/5 p-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-white/45">Mirror Mode</p>
+                <p id="mirrorReadout" class="mt-1 text-lg font-semibold text-white">On</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="flex w-full max-w-xl flex-col gap-4 rounded-[1.5rem] border border-white/10 bg-black/30 p-4">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-cyan-300/80">Script Editor</p>
+              <h2 class="mt-1 text-xl font-semibold">Write once, rehearse everywhere</h2>
+            </div>
+
+            <label class="text-sm text-white/80" for="editor">Your script</label>
+            <textarea
+              id="editor"
+              class="min-h-[220px] rounded-[1.25rem] border border-white/10 bg-white px-4 py-4 text-base text-slate-900 outline-none ring-0 placeholder:text-slate-500"
+              placeholder="Write or paste your talking points here..."
+            ></textarea>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="space-y-2 rounded-2xl bg-white/5 p-3 text-sm text-white/80">
+                <span class="flex items-center justify-between">
+                  <span>Text size</span>
+                  <span id="sliderSizeReadout">34 px</span>
+                </span>
+                <input id="fontSize" type="range" min="20" max="72" value="34" class="w-full accent-cyan-400" />
+              </label>
+
+              <label class="space-y-2 rounded-2xl bg-white/5 p-3 text-sm text-white/80">
+                <span class="flex items-center justify-between">
+                  <span>Scroll speed</span>
+                  <span id="sliderSpeedReadout">0.8</span>
+                </span>
+                <input id="speedControl" type="range" min="0.2" max="4" step="0.1" value="0.8" class="w-full accent-cyan-400" />
+              </label>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button id="saveBtn" class="rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300">
+                Save script
+              </button>
+              <button id="fullscreenBtn" class="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 font-semibold text-white transition hover:bg-white/10">
+                Fullscreen
+              </button>
+            </div>
+
+            <label class="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/80">
+              <span>Mirror text for camera rigs</span>
+              <input id="mirrorToggle" type="checkbox" class="h-5 w-5 accent-cyan-400" checked />
+            </label>
+
+            <p class="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+              Tip: tap the teleprompter text to play/pause instantly while you record.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <div class="fixed bottom-4 left-1/2 z-20 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border border-white/10 bg-slate-950/85 px-3 py-3 shadow-2xl shadow-black/50 backdrop-blur">
+        <button id="startBtn" class="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-emerald-400">
+          Start
+        </button>
+        <button id="stopBtn" class="rounded-full bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400">
+          Stop
+        </button>
+        <button id="speedDownBtn" class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10">
+          Slower
+        </button>
+        <button id="speedUpBtn" class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold transition hover:bg-white/10">
+          Faster
+        </button>
+      </div>
+    </main>
+
+    <script>
+      const STORAGE_KEY = 'isaac-teleprompter-state';
+      const DEFAULT_SCRIPT = `Hook your audience in the first five seconds.\n\nPause with intention.\n\nSpeak like you are helping one real person, not performing for a crowd.\n\nEnd with one clear action for your viewer.`;
+      const defaults = {
+        script: DEFAULT_SCRIPT,
+        speed: 0.8,
+        fontSize: 34,
+        mirror: true,
+      };
+
+      const elements = {
+        camera: document.getElementById('camera'),
+        cameraStatus: document.getElementById('cameraStatus'),
+        script: document.getElementById('script'),
+        editor: document.getElementById('editor'),
+        speedReadout: document.getElementById('speedReadout'),
+        sizeReadout: document.getElementById('sizeReadout'),
+        mirrorReadout: document.getElementById('mirrorReadout'),
+        sliderSizeReadout: document.getElementById('sliderSizeReadout'),
+        sliderSpeedReadout: document.getElementById('sliderSpeedReadout'),
+        fontSize: document.getElementById('fontSize'),
+        speedControl: document.getElementById('speedControl'),
+        mirrorToggle: document.getElementById('mirrorToggle'),
+        scrollStateText: document.getElementById('scrollStateText'),
+        scrollStateDot: document.getElementById('scrollStateDot'),
+        saveBtn: document.getElementById('saveBtn'),
+        fullscreenBtn: document.getElementById('fullscreenBtn'),
+        startBtn: document.getElementById('startBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        speedUpBtn: document.getElementById('speedUpBtn'),
+        speedDownBtn: document.getElementById('speedDownBtn'),
+      };
+
+      let state = loadState();
+      let scrolling = false;
+      let animationFrameId = null;
+
+      function loadState() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return { ...defaults };
+
+        try {
+          return { ...defaults, ...JSON.parse(stored) };
+        } catch {
+          return { ...defaults };
+        }
+      }
+
+      function persistState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function renderScript() {
+        const paragraphs = state.script
+          .split(/\n{2,}/)
+          .map((block) => block.trim())
+          .filter(Boolean);
+
+        elements.script.innerHTML = paragraphs.length
+          ? paragraphs.map((paragraph) => `<p class="mb-6 last:mb-0">${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`).join('')
+          : '<p class="text-white/40">Your script will appear here.</p>';
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      function updateTelemetry() {
+        elements.speedReadout.textContent = `${state.speed.toFixed(1)} px/frame`;
+        elements.sliderSpeedReadout.textContent = state.speed.toFixed(1);
+        elements.sizeReadout.textContent = `${state.fontSize}px`;
+        elements.sliderSizeReadout.textContent = `${state.fontSize}px`;
+        elements.mirrorReadout.textContent = state.mirror ? 'On' : 'Off';
+        elements.script.style.fontSize = `${state.fontSize}px`;
+        elements.script.classList.toggle('mirror-text', state.mirror);
+        elements.scrollStateText.textContent = scrolling ? 'Scrolling' : 'Paused';
+        elements.scrollStateDot.className = `h-2.5 w-2.5 rounded-full ${scrolling ? 'bg-emerald-400' : 'bg-amber-400'}`;
+      }
+
+      function syncControls() {
+        elements.editor.value = state.script;
+        elements.fontSize.value = state.fontSize;
+        elements.speedControl.value = state.speed;
+        elements.mirrorToggle.checked = state.mirror;
+      }
+
+      function applyState() {
+        renderScript();
+        syncControls();
+        updateTelemetry();
+        persistState();
+      }
+
+      function scrollLoop() {
+        if (!scrolling) return;
+        elements.script.scrollTop += state.speed;
+        animationFrameId = window.requestAnimationFrame(scrollLoop);
+      }
+
+      function startScroll() {
+        if (scrolling) return;
+        scrolling = true;
+        updateTelemetry();
+        scrollLoop();
+      }
+
+      function stopScroll() {
+        scrolling = false;
+        if (animationFrameId) {
+          window.cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        updateTelemetry();
+      }
+
+      function toggleScroll() {
+        if (scrolling) {
+          stopScroll();
+        } else {
+          startScroll();
+        }
+      }
+
+      function changeSpeed(delta) {
+        state.speed = Math.min(4, Math.max(0.2, +(state.speed + delta).toFixed(1)));
+        applyState();
+      }
+
+      function setFontSize(size) {
+        state.fontSize = Math.min(72, Math.max(20, Number(size)));
+        applyState();
+      }
+
+      function saveScript() {
+        state.script = elements.editor.value.trim() || DEFAULT_SCRIPT;
+        applyState();
+      }
+
+      async function startCamera() {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          elements.cameraStatus.textContent = 'Camera API unavailable in this browser.';
+          return;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'user',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
+            audio: false,
+          });
+          elements.camera.srcObject = stream;
+          elements.cameraStatus.textContent = 'Camera live';
+        } catch (error) {
+          elements.cameraStatus.textContent = 'Camera blocked. Use HTTPS + Safari on iPhone.';
+          console.error(error);
+        }
+      }
+
+      async function goFullscreen() {
+        const target = document.documentElement;
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          return;
+        }
+
+        if (target.requestFullscreen) {
+          await target.requestFullscreen();
+        }
+      }
+
+      function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch((error) => {
+              console.error('Service worker registration failed', error);
+            });
+          });
+        }
+      }
+
+      elements.startBtn.addEventListener('click', startScroll);
+      elements.stopBtn.addEventListener('click', stopScroll);
+      elements.speedUpBtn.addEventListener('click', () => changeSpeed(0.2));
+      elements.speedDownBtn.addEventListener('click', () => changeSpeed(-0.2));
+      elements.saveBtn.addEventListener('click', saveScript);
+      elements.fullscreenBtn.addEventListener('click', goFullscreen);
+      elements.script.addEventListener('click', toggleScroll);
+      elements.fontSize.addEventListener('input', (event) => setFontSize(event.target.value));
+      elements.speedControl.addEventListener('input', (event) => {
+        state.speed = Number(event.target.value);
+        applyState();
+      });
+      elements.mirrorToggle.addEventListener('change', (event) => {
+        state.mirror = event.target.checked;
+        applyState();
+      });
+      elements.editor.addEventListener('keydown', (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+          event.preventDefault();
+          saveScript();
+        }
+      });
+
+      applyState();
+      startCamera();
+      registerServiceWorker();
+    </script>
+  </body>
+</html>
